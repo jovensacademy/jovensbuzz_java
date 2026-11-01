@@ -1,0 +1,34 @@
+# Only pom.xml and src/main are needed to build the image; secrets never enter the build context
+.git
+target/
+src/test/
+docs/
+scripts/
+.mvn/
+mvnw
+mvnw.cmd
+HELP.md
+README.md
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Secrets and local configuration
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*-credentials.json
+*service-account*.json
+secrets/
+
+# IDE / OS / logs
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+*.iml
+*.log

@@ -1,0 +1,83 @@
+# Jovens Buzz API + its own MySQL database.
+#
+# Usage (from backend/):  docker compose --env-file .env.docker up -d --build
+#
+# Everything is namespaced "jovens-buzz" (project, containers, network, volume) so it never
+# collides with other stacks on the same server (e.g. Jovens Yoga on port 8081).
+# Secrets live only in .env.docker (git-ignored; copy .env.docker.example).
+
+name: jovens-buzz
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: jovens-buzz-mysql
+    restart: unless-stopped
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-jovens_buzz}
+      MYSQL_USER: ${DB_USERNAME:?Set DB_USERNAME in .env.docker}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env.docker}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env.docker}
+      TZ: UTC
+    volumes:
+      - jovens_buzz_mysql_data:/var/lib/mysql
+    # No published port: only the backend container can reach the database
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - jovens-buzz
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: jovens-buzz-backend:latest
+    container_name: jovens-buzz-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      # Fixed for this stack; everything else comes from .env.docker
+      PORT: "8082"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_NAME: ${DB_NAME:-jovens_buzz}
+    ports:
+      # Loopback only by default: put Nginx/Caddy (HTTPS) in front. Set BACKEND_BIND_ADDRESS=0.0.0.0 to expose directly.
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:8082:8082"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - jovens-buzz
+
+volumes:
+  jovens_buzz_mysql_data:
+    name: jovens_buzz_mysql_data
+
+networks:
+  jovens-buzz:
+    name: jovens-buzz-network
+    ipam:
+      config:
+        # Fixed subnet so the host-side gateway (172.29.82.1) can be listed in TRUSTED_PROXIES.
+        # Change it if it overlaps a network that already exists on the server.
+        - subnet: 172.29.82.0/24
+          gateway: 172.29.82.1
