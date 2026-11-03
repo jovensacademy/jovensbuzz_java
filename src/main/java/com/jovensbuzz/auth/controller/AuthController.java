@@ -1,12 +1,14 @@
 package com.jovensbuzz.auth.controller;
 
 import com.jovensbuzz.auth.dto.AdminProfileDto;
-import com.jovensbuzz.auth.dto.ChangePasswordRequest;
 import com.jovensbuzz.auth.dto.LoginRequest;
 import com.jovensbuzz.auth.dto.LoginResponse;
 import com.jovensbuzz.auth.dto.UpdateProfileRequest;
 import com.jovensbuzz.auth.service.AuthService;
 import com.jovensbuzz.common.response.ApiResponse;
+import com.jovensbuzz.common.util.TimeZones;
+import java.util.List;
+import java.util.Map;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -57,6 +59,12 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUserProfile(userDetails.getUsername())));
     }
 
+    @GetMapping("/timezones")
+    @Operation(summary = "Time zones for profile settings", description = "IANA zones offered in the dashboard")
+    public ResponseEntity<ApiResponse<List<Map<String, String>>>> timezones() {
+        return ResponseEntity.ok(ApiResponse.success(TimeZones.OPTIONS));
+    }
+
     @PutMapping("/me")
     @Operation(summary = "Update admin profile", description = "Updates the display name and email of the authenticated administrator")
     public ResponseEntity<ApiResponse<AdminProfileDto>> updateProfile(
@@ -66,12 +74,4 @@ public class AuthController {
                 authService.updateProfile(userDetails.getUsername(), request)));
     }
 
-    @PostMapping("/change-password")
-    @Operation(summary = "Change password", description = "Changes the password, revokes other sessions and returns a new token")
-    public ResponseEntity<ApiResponse<LoginResponse>> changePassword(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @Valid @RequestBody ChangePasswordRequest request) {
-        return ResponseEntity.ok(ApiResponse.success("Password changed successfully",
-                authService.changePassword(userDetails.getUsername(), request)));
-    }
 }

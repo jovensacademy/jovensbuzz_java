@@ -2,10 +2,14 @@ package com.jovensbuzz.enquiry.entity;
 
 import com.jovensbuzz.admin.entity.AdminUser;
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 import java.time.Instant;
 
 @Entity
 @Table(name = "enquiries")
+// Soft-deleted enquiries are invisible to every entity query (lists, counts, analytics, exports, duplicate
+// checks). Only the native queries in EnquiryRepository (deleted list, restore, reference check) see them.
+@SQLRestriction("deleted_at IS NULL")
 public class Enquiry {
 
     @Id
@@ -67,6 +71,12 @@ public class Enquiry {
     // SHA-256 of normalised email/service/message, used to collapse accidental resubmissions
     @Column(name = "submission_fingerprint", length = 64)
     private String submissionFingerprint;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deleted_by", length = 64)
+    private String deletedBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
@@ -247,5 +257,21 @@ public class Enquiry {
 
     public void setLastName(String lastName) {
         this.lastName = lastName;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public String getDeletedBy() {
+        return deletedBy;
+    }
+
+    public void setDeletedBy(String deletedBy) {
+        this.deletedBy = deletedBy;
     }
 }

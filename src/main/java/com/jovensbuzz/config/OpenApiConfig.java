@@ -21,7 +21,7 @@ public class OpenApiConfig {
                         .title("Jovens Buzz Digital Marketing Agency API")
                         .description("REST API for Jovens Buzz website, public enquiry handling, admin dashboard and integrations.")
                         .version("v1.0.0")
-                        .contact(new Contact().name("Jovens Buzz Engineering").email("jovensbuzz@gmail.com"))
+                        .contact(new Contact().name("Jovens Buzz Engineering").email("hello@jovensbuzz.com"))
                         .license(new License().name("Proprietary").url("https://jovensbuzz.com")))
                 .addSecurityItem(new SecurityRequirement().addList(securitySchemeName))
                 .components(new Components()

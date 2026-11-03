@@ -62,9 +62,9 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/auth/me
 curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/auth/refresh      # new token, fresh expiry
 curl -X PUT  -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      -d '{"displayName":"Jovens Admin","email":"admin@jovensbuzz.com"}' http://localhost:8081/api/v1/auth/me
+# Owner only: set a password for any account (incl. own); that account's sessions are revoked
 curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
-     -d '{"currentPassword":"Jovensbuzz@2026","newPassword":"A-New#Strong-Passw0rd"}' \
-     http://localhost:8081/api/v1/auth/change-password    # returns a new token; old tokens are revoked
+     -d '{"newPassword":"A-New#Strong-Passw0rd"}' http://localhost:8081/api/v1/admin/admin-users/2/reset-password
 curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8081/api/v1/auth/logout       # revokes all tokens
 ```
 
@@ -119,6 +119,11 @@ curl -H "$H" -o enquiries.csv "http://localhost:8081/api/v1/admin/enquiries/expo
 ## Content management
 
 ```bash
+# Enquiry deletion: soft delete (PERM_ENQUIRIES_DELETE), then permanent delete (owner only, cannot be undone)
+curl -X DELETE -H "$H" http://localhost:8081/api/v1/admin/enquiries/42
+curl -H "$H" http://localhost:8081/api/v1/admin/enquiries/deleted
+curl -X DELETE -H "$H" http://localhost:8081/api/v1/admin/enquiries/deleted/42   # managers: 403; there is no restore
+
 # Services (CRUD)
 curl -H "$H" http://localhost:8081/api/v1/admin/services
 curl -X POST -H "$H" -H "Content-Type: application/json" \

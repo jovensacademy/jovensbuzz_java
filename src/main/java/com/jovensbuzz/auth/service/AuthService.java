@@ -4,7 +4,6 @@ import com.jovensbuzz.admin.entity.AdminUser;
 import com.jovensbuzz.admin.repository.AdminUserRepository;
 import com.jovensbuzz.audit.service.AuditLogService;
 import com.jovensbuzz.auth.dto.AdminProfileDto;
-import com.jovensbuzz.auth.dto.ChangePasswordRequest;
 import com.jovensbuzz.auth.dto.LoginRequest;
 import com.jovensbuzz.auth.dto.LoginResponse;
 import com.jovensbuzz.auth.dto.UpdateProfileRequest;
@@ -12,6 +11,7 @@ import com.jovensbuzz.common.exception.AccountLockedException;
 import com.jovensbuzz.common.exception.BadRequestException;
 import com.jovensbuzz.common.exception.UnauthorizedException;
 import com.jovensbuzz.common.validation.PasswordPolicy;
+import com.jovensbuzz.common.util.TimeZones;
 import com.jovensbuzz.common.validation.InputSanitizer;
 import com.jovensbuzz.security.JwtTokenProvider;
 import org.slf4j.Logger;
@@ -62,7 +62,7 @@ public class AuthService {
     @Transactional(noRollbackFor = {AuthenticationException.class, AccountLockedException.class})
     public LoginResponse login(LoginRequest request) {
         String username = request.getUsername().trim();
-        AdminUser admin = adminUserRepository.findByUsername(username).orElse(null);
+        AdminUser admin = adminUserRepository.findByUsername(username).filter(a -> !a.isDeleted()).orElse(null);
         Instant now = Instant.now();
 
         if (admin != null && admin.getLockedUntil() != null && admin.getLockedUntil().isAfter(now)) {
@@ -133,43 +133,22 @@ public class AuthService {
 
         admin.setDisplayName(InputSanitizer.plainText(request.getDisplayName()));
         admin.setEmail(email);
+        String details = "Updated display name/email";
+        if (request.getTimezone() != null && !request.getTimezone().isBlank()) {
+            String zone = TimeZones.requireRegion(request.getTimezone());
+            if (!zone.equals(admin.getTimezone())) {
+                details += "; time zone " + admin.getTimezone() + " -> " + zone;
+                admin.setTimezone(zone);
+            }
+        }
         adminUserRepository.save(admin);
-        auditLogService.logAction(username, "UPDATE_PROFILE", "ADMIN_USER", String.valueOf(admin.getId()), "Updated display name/email");
+        auditLogService.logAction(username, "UPDATE_PROFILE", "ADMIN_USER", String.valueOf(admin.getId()), details);
         return AdminProfileDto.fromEntity(admin);
-    }
-
-    /**
-     * Changes the password and revokes all existing sessions. Returns a fresh token
-     * so the caller's current session continues seamlessly.
-     */
-    @Transactional
-    public LoginResponse changePassword(String username, ChangePasswordRequest request) {
-        AdminUser admin = requireAdmin(username);
-
-        if (!passwordEncoder.matches(request.getCurrentPassword(), admin.getPasswordHash())) {
-            throw new BadRequestException("Current password is incorrect");
-        }
-        if (passwordEncoder.matches(request.getNewPassword(), admin.getPasswordHash())) {
-            throw new BadRequestException("New password must be different from the current password");
-        }
-        List<String> problems = PasswordPolicy.validate(request.getNewPassword(), admin.getUsername());
-        if (!problems.isEmpty()) {
-            throw new BadRequestException("Password does not meet the policy: " + String.join("; ", problems));
-        }
-
-        admin.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
-        admin.setPasswordChangedAt(Instant.now());
-        admin.setMustChangePassword(false);
-        admin.setTokenVersion(admin.getTokenVersion() + 1);
-        adminUserRepository.save(admin);
-        auditLogService.logAction(username, "CHANGE_PASSWORD", "ADMIN_USER", String.valueOf(admin.getId()), "Password changed; other sessions revoked");
-
-        return buildLoginResponse(admin);
     }
 
     private AdminUser requireAdmin(String username) {
         return adminUserRepository.findByUsername(username)
-                .filter(AdminUser::isEnabled)
+                .filter(AdminUser::isActive)
                 .orElseThrow(() -> new UnauthorizedException("Session is no longer valid"));
     }
 
@@ -183,7 +162,6 @@ public class AuthService {
                 admin.getRole()
         );
         response.setExpiresAt(issued.expiresAt());
-        response.setMustChangePassword(admin.isMustChangePassword());
         return response;
     }
 }

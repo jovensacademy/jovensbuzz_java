@@ -99,6 +99,13 @@
 			<artifactId>flyway-mysql</artifactId>
 		</dependency>
 
+		<!-- Excel import/export (.xlsx via OOXML, .xls via HSSF) -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.5.1</version>
+		</dependency>
+
 		<!-- Google Sheets Integration -->
 		<dependency>
 			<groupId>com.google.api-client</groupId>

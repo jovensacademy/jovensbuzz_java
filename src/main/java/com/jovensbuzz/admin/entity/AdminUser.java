@@ -2,6 +2,9 @@ package com.jovensbuzz.admin.entity;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "admin_users")
@@ -24,7 +27,7 @@ public class AdminUser {
     private String email;
 
     @Column(nullable = false, length = 32)
-    private String role = "ROLE_ADMIN";
+    private String role = "ROLE_MANAGER";
 
     @Column(nullable = false)
     private boolean enabled = true;
@@ -42,6 +45,8 @@ public class AdminUser {
     @Column(name = "token_version", nullable = false)
     private int tokenVersion = 0;
 
+    // Legacy column (V3), no longer read: passwords are set by owners and never force a change.
+    // Kept so existing rows and the schema stay untouched.
     @Column(name = "must_change_password", nullable = false)
     private boolean mustChangePassword = false;
 
@@ -54,6 +59,21 @@ public class AdminUser {
     @Column(name = "password_changed_at")
     private Instant passwordChangedAt;
 
+    // Comma-separated AdminPermission names; only meaningful for managers (owners hold all)
+    @Column(length = 512)
+    private String permissions;
+
+    // IANA zone used to display dates for this user, e.g. Asia/Kolkata or America/Chicago
+    @Column(nullable = false, length = 64)
+    private String timezone = "America/Chicago";
+
+    // Soft deletion: the row stays for audit history; the account can never sign in again
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deleted_by", length = 64)
+    private String deletedBy;
+
     public AdminUser() {}
 
     public AdminUser(String username, String passwordHash, String displayName, String email, String role) {
@@ -61,7 +81,7 @@ public class AdminUser {
         this.passwordHash = passwordHash;
         this.displayName = displayName;
         this.email = email;
-        this.role = role != null ? role : "ROLE_ADMIN";
+        this.role = role != null ? role : "ROLE_MANAGER";
         this.enabled = true;
         this.createdAt = Instant.now();
         this.updatedAt = Instant.now();
@@ -196,5 +216,80 @@ public class AdminUser {
 
     public void setPasswordChangedAt(Instant passwordChangedAt) {
         this.passwordChangedAt = passwordChangedAt;
+    }
+
+    public String getPermissions() {
+        return permissions;
+    }
+
+    public void setPermissions(String permissions) {
+        this.permissions = permissions;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
+    }
+
+    public Instant getDeletedAt() {
+        return deletedAt;
+    }
+
+    public void setDeletedAt(Instant deletedAt) {
+        this.deletedAt = deletedAt;
+    }
+
+    public String getDeletedBy() {
+        return deletedBy;
+    }
+
+    public void setDeletedBy(String deletedBy) {
+        this.deletedBy = deletedBy;
+    }
+
+    // ---------------------------------------------------------------- role helpers
+
+    public AdminRole getAdminRole() {
+        return AdminRole.from(role);
+    }
+
+    public boolean isOwner() {
+        return getAdminRole() == AdminRole.OWNER;
+    }
+
+    public boolean isDeleted() {
+        return deletedAt != null;
+    }
+
+    /** Enabled, not deleted. (A temporary login lock does not make an account inactive.) */
+    public boolean isActive() {
+        return enabled && deletedAt == null;
+    }
+
+    /** Permissions stored for a manager (empty for owners, who hold all of them implicitly). */
+    public Set<AdminPermission> getAssignedPermissions() {
+        return AdminPermission.parse(permissions);
+    }
+
+    public void setAssignedPermissions(Set<AdminPermission> assigned) {
+        this.permissions = assigned == null || assigned.isEmpty() ? null : assigned.stream()
+                .filter(AdminPermission::isAssignableToManager)
+                .map(Enum::name)
+                .sorted()
+                .collect(Collectors.joining(","));
+    }
+
+    /** What this account may actually do: everything for an owner, the assigned subset for a manager. */
+    public Set<AdminPermission> getEffectivePermissions() {
+        if (isOwner()) {
+            return AdminPermission.all();
+        }
+        EnumSet<AdminPermission> set = EnumSet.noneOf(AdminPermission.class);
+        set.addAll(getAssignedPermissions());
+        set.remove(AdminPermission.USERS_MANAGE);
+        return set;
     }
 }

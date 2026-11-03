@@ -92,7 +92,7 @@ public class AdminEnquiryControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "jovens_buzz_2026", roles = {"ADMIN"})
+    @WithMockUser(username = "jovens_buzz_2026", authorities = {"ROLE_MANAGER", "PERM_ENQUIRIES_VIEW"})
     void list_passesFiltersAndClampsPagination() throws Exception {
         when(enquiryService.getEnquiries(any(), any(), any(), any(), any(), any(), any(Pageable.class)))
                 .thenReturn(new PagedResponse<>(List.of(new EnquiryResponseDto()), 2, 100, 201, 3, false));
@@ -115,7 +115,7 @@ public class AdminEnquiryControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "jovens_buzz_2026", roles = {"ADMIN"})
+    @WithMockUser(username = "jovens_buzz_2026", authorities = {"ROLE_MANAGER", "PERM_ENQUIRIES_VIEW", "PERM_ENQUIRIES_MANAGE"})
     void updateStatus_asAdmin_returnsOk() throws Exception {
         EnquiryStatusUpdateRequest request = new EnquiryStatusUpdateRequest("CONTACTED", "Called client");
 
@@ -136,7 +136,7 @@ public class AdminEnquiryControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "jovens_buzz_2026", roles = {"ADMIN"})
+    @WithMockUser(username = "jovens_buzz_2026", authorities = {"ROLE_MANAGER", "PERM_ENQUIRIES_VIEW", "PERM_ENQUIRIES_MANAGE"})
     void updateStatus_blankStatus_returnsBadRequest() throws Exception {
         mockMvc.perform(patch("/api/v1/admin/enquiries/1/status")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -146,9 +146,27 @@ public class AdminEnquiryControllerTest {
     }
 
     @Test
-    @WithMockUser(username = "jovens_buzz_2026", roles = {"ADMIN"})
+    @WithMockUser(username = "jovens_buzz_2026", authorities = {"ROLE_MANAGER", "PERM_ENQUIRIES_VIEW"})
     void nonNumericId_returnsBadRequest() throws Exception {
         mockMvc.perform(get("/api/v1/admin/enquiries/abc"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(username = "jovens_buzz_2026", authorities = {"ROLE_MANAGER", "PERM_ENQUIRIES_VIEW"})
+    void viewOnlyManager_cannotChangeStatus() throws Exception {
+        mockMvc.perform(patch("/api/v1/admin/enquiries/1/status")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CONTACTED\"}"))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(enquiryService);
+    }
+
+    @Test
+    @WithMockUser(username = "jovens_buzz_2026", authorities = {"ROLE_MANAGER", "PERM_ENQUIRIES_VIEW"})
+    void managerWithoutExportPermission_cannotExport() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/enquiries/export")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/admin/enquiries/export/excel")).andExpect(status().isForbidden());
+        verifyNoInteractions(enquiryService);
     }
 }

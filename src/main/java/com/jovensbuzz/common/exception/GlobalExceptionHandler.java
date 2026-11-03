@@ -111,6 +111,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE).body(ApiResponse.error("Unsupported content type"));
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUploadTooLarge(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(ApiResponse.error("The file is larger than 5 MB"));
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingPart(org.springframework.web.multipart.support.MissingServletRequestPartException ex) {
+        return ResponseEntity.badRequest().body(ApiResponse.error("Choose an Excel file (.xlsx or .xls) to import"));
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNoResource(NoResourceFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("Resource not found"));

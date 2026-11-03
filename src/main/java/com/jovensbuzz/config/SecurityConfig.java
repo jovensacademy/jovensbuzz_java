@@ -95,8 +95,25 @@ public class SecurityConfig {
                     auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll();
                 }
 
-                // Protected Admin APIs
-                auth.requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                // Protected Admin APIs: permission matrix (first match wins). OWNER accounts hold every
+                // PERM_* authority; MANAGER accounts hold only what an owner assigned. Anything not
+                // listed below falls through to owner-only (PERM_USERS_MANAGE).
+                auth.requestMatchers("/api/v1/admin/admin-users", "/api/v1/admin/admin-users/**").hasAuthority("PERM_USERS_MANAGE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/users").hasAuthority("PERM_ENQUIRIES_VIEW") // assignee picker
+                    .requestMatchers("/api/v1/admin/enquiries/export", "/api/v1/admin/enquiries/export/**").hasAuthority("PERM_ENQUIRIES_EXPORT")
+                    .requestMatchers("/api/v1/admin/enquiries/import", "/api/v1/admin/enquiries/import/**").hasAuthority("PERM_ENQUIRIES_IMPORT")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/enquiries/deleted").hasAuthority("PERM_ENQUIRIES_DELETE")
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/enquiries/deleted/*").hasRole("OWNER") // permanent, owner only
+                    .requestMatchers(HttpMethod.DELETE, "/api/v1/admin/enquiries/*").hasAuthority("PERM_ENQUIRIES_DELETE")
+                    .requestMatchers(HttpMethod.GET, "/api/v1/admin/enquiries", "/api/v1/admin/enquiries/**").hasAuthority("PERM_ENQUIRIES_VIEW")
+                    .requestMatchers("/api/v1/admin/enquiries", "/api/v1/admin/enquiries/**").hasAuthority("PERM_ENQUIRIES_MANAGE")
+                    .requestMatchers("/api/v1/admin/dashboard/**").hasAuthority("PERM_ANALYTICS_VIEW")
+                    .requestMatchers("/api/v1/admin/services/**", "/api/v1/admin/services",
+                            "/api/v1/admin/faqs/**", "/api/v1/admin/faqs",
+                            "/api/v1/admin/content/**", "/api/v1/admin/content").hasAuthority("PERM_CONTENT_MANAGE")
+                    .requestMatchers("/api/v1/admin/settings/**").hasAuthority("PERM_SETTINGS_VIEW")
+                    .requestMatchers("/api/v1/admin/audit-logs", "/api/v1/admin/audit-logs/**").hasAuthority("PERM_AUDIT_VIEW")
+                    .requestMatchers("/api/v1/admin/**").hasAuthority("PERM_USERS_MANAGE")
                     .requestMatchers("/api/v1/auth/**").authenticated()
                     .anyRequest().denyAll();
             });

@@ -35,7 +35,7 @@ public class AdminSettingsController {
     @Operation(summary = "List administrators", description = "Enabled administrators available for lead assignment")
     public ResponseEntity<ApiResponse<List<AdminSummaryDto>>> listAdmins() {
         List<AdminSummaryDto> admins = adminUserRepository.findAll().stream()
-                .filter(admin -> admin.isEnabled())
+                .filter(admin -> admin.isActive())
                 .map(AdminSummaryDto::fromEntity)
                 .toList();
         return ResponseEntity.ok(ApiResponse.success(admins));

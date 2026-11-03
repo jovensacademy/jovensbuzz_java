@@ -51,11 +51,15 @@ class EnquiryFlowIntegrationTest {
     private IntegrationSyncJobRepository syncJobRepository;
     @Autowired
     private EmailNotificationJobRepository emailJobRepository;
+    @Autowired
+    private com.jovensbuzz.admin.repository.AdminUserRepository adminUserRepository;
 
     private String token;
 
     @BeforeEach
     void login() throws Exception {
+        // The test owner was bootstrapped with a temporary password; treat it as already changed
+        adminUserRepository.findByUsername(ADMIN).ifPresent(o -> { o.setMustChangePassword(false); adminUserRepository.save(o); });
         MvcResult result = mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("username", ADMIN, "password", PASSWORD))))

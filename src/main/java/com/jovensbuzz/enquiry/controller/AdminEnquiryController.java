@@ -14,6 +14,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -75,6 +76,28 @@ public class AdminEnquiryController {
         return ResponseEntity.ok(ApiResponse.success(Map.of(
                 "statuses", statuses,
                 "services", enquiryService.getServiceFilterOptions())));
+    }
+
+    @GetMapping("/deleted")
+    @Operation(summary = "List deleted enquiries", description = "Soft-deleted enquiries (PERM_ENQUIRIES_DELETE); owners can delete them permanently")
+    public ResponseEntity<ApiResponse<List<DeletedEnquiryDto>>> getDeleted() {
+        return ResponseEntity.ok(ApiResponse.success(enquiryService.getDeletedEnquiries()));
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Delete an enquiry", description = "Soft delete: hidden from lists, analytics and exports; moves to Deleted enquiries; audited")
+    public ResponseEntity<ApiResponse<Void>> deleteEnquiry(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        enquiryService.deleteEnquiry(id, username(userDetails));
+        return ResponseEntity.ok(ApiResponse.success("Enquiry deleted", null));
+    }
+
+    @DeleteMapping("/deleted/{id}")
+    @PreAuthorize("hasRole('OWNER')")
+    @Operation(summary = "Permanently delete a deleted enquiry",
+            description = "Owner only. Removes an enquiry that is already in Deleted enquiries; cannot be undone; audited")
+    public ResponseEntity<ApiResponse<Void>> permanentlyDeleteEnquiry(@PathVariable Long id, @AuthenticationPrincipal UserDetails userDetails) {
+        enquiryService.permanentlyDeleteEnquiry(id, username(userDetails));
+        return ResponseEntity.ok(ApiResponse.success("Enquiry permanently deleted", null));
     }
 
     @GetMapping("/{id}")

@@ -96,6 +96,9 @@ docker exec jovens-buzz-mysql sh -c 'exec mysqldump --single-transaction --routi
 gunzip -c ~/backups/jovens_buzz-YYYY-MM-DD.sql.gz | docker exec -i jovens-buzz-mysql sh -c 'exec mysql -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"'
 ```
 
+Deleted enquiries have no restore in the app, and an owner's permanent delete is final: these backups are the
+only way to recover one.
+
 **Never run** `docker compose down -v` (deletes the database volume) or `docker system prune --volumes`
 (can delete other stacks' data). `docker compose --env-file .env.docker down` without `-v` is safe.
 

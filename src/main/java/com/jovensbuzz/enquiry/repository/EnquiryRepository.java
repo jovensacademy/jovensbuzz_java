@@ -20,7 +20,13 @@ public interface EnquiryRepository extends JpaRepository<Enquiry, Long>, JpaSpec
 
     Optional<Enquiry> findByPublicReference(String publicReference);
 
-    boolean existsByPublicReference(String publicReference);
+    /** Includes soft-deleted rows: references are UNIQUE in the table, so a new one must not reuse a deleted one. */
+    @Query(value = "SELECT COUNT(*) FROM enquiries WHERE public_reference = :ref", nativeQuery = true)
+    long countByPublicReferenceIncludingDeleted(@Param("ref") String publicReference);
+
+    default boolean existsByPublicReference(String publicReference) {
+        return countByPublicReferenceIncludingDeleted(publicReference) > 0;
+    }
 
     Optional<Enquiry> findFirstBySubmissionFingerprintAndCreatedAtAfterOrderByCreatedAtDesc(
             String submissionFingerprint, Instant after);
@@ -81,4 +87,26 @@ public interface EnquiryRepository extends JpaRepository<Enquiry, Long>, JpaSpec
 
     @Query("SELECT DISTINCT e.serviceInterest FROM Enquiry e ORDER BY e.serviceInterest")
     List<String> findDistinctServiceInterests();
+
+    /** [fingerprint, publicReference] pairs for existing enquiries with any of the given fingerprints. */
+    @Query("SELECT e.submissionFingerprint, e.publicReference FROM Enquiry e WHERE e.submissionFingerprint IN :fingerprints")
+    List<Object[]> findReferencesByFingerprints(@Param("fingerprints") java.util.Collection<String> fingerprints);
+
+    // ---------------------------------------------------------------- soft-deleted enquiries (native: bypass @SQLRestriction)
+
+    @Query(value = "SELECT * FROM enquiries WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 500", nativeQuery = true)
+    List<Enquiry> findDeleted();
+
+    /** [publicReference, fullName, deletedAt, deletedBy] of a soft-deleted enquiry, row-locked for permanent deletion. */
+    @Query(value = "SELECT public_reference, full_name, deleted_at, deleted_by FROM enquiries WHERE id = :id AND deleted_at IS NOT NULL FOR UPDATE",
+            nativeQuery = true)
+    List<Object[]> lockDeletedForPurge(@Param("id") Long id);
+
+    /** Hard delete of a soft-deleted enquiry. Notes, status history and job rows go with it (ON DELETE CASCADE). */
+    @org.springframework.data.jpa.repository.Modifying
+    @Query(value = "DELETE FROM enquiries WHERE id = :id AND deleted_at IS NOT NULL", nativeQuery = true)
+    int purgeDeleted(@Param("id") Long id);
+
+    @Query(value = "SELECT public_reference, full_name FROM enquiries WHERE id = :id", nativeQuery = true)
+    List<Object[]> findReferenceAndNameIncludingDeleted(@Param("id") Long id);
 }

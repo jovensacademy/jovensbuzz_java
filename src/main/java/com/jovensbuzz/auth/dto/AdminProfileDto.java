@@ -2,6 +2,7 @@ package com.jovensbuzz.auth.dto;
 
 import com.jovensbuzz.admin.entity.AdminUser;
 import java.time.Instant;
+import java.util.List;
 
 public class AdminProfileDto {
     private Long id;
@@ -11,8 +12,11 @@ public class AdminProfileDto {
     private String role;
     private Instant createdAt;
     private Instant lastLoginAt;
-    private boolean mustChangePassword;
     private Instant passwordChangedAt;
+    // OWNER or MANAGER, the effective permissions the UI should offer, and the display time zone
+    private String adminRole;
+    private List<String> permissions;
+    private String timezone;
 
     public AdminProfileDto() {}
 
@@ -25,8 +29,10 @@ public class AdminProfileDto {
         dto.setRole(admin.getRole());
         dto.setCreatedAt(admin.getCreatedAt());
         dto.setLastLoginAt(admin.getLastLoginAt());
-        dto.setMustChangePassword(admin.isMustChangePassword());
         dto.setPasswordChangedAt(admin.getPasswordChangedAt());
+        dto.setAdminRole(admin.getAdminRole().name());
+        dto.setPermissions(admin.getEffectivePermissions().stream().map(Enum::name).sorted().toList());
+        dto.setTimezone(admin.getTimezone());
         return dto;
     }
 
@@ -86,13 +92,6 @@ public class AdminProfileDto {
         this.lastLoginAt = lastLoginAt;
     }
 
-    public boolean isMustChangePassword() {
-        return mustChangePassword;
-    }
-
-    public void setMustChangePassword(boolean mustChangePassword) {
-        this.mustChangePassword = mustChangePassword;
-    }
 
     public Instant getPasswordChangedAt() {
         return passwordChangedAt;
@@ -100,5 +99,29 @@ public class AdminProfileDto {
 
     public void setPasswordChangedAt(Instant passwordChangedAt) {
         this.passwordChangedAt = passwordChangedAt;
+    }
+
+    public String getAdminRole() {
+        return adminRole;
+    }
+
+    public void setAdminRole(String adminRole) {
+        this.adminRole = adminRole;
+    }
+
+    public List<String> getPermissions() {
+        return permissions;
+    }
+
+    public void setPermissions(List<String> permissions) {
+        this.permissions = permissions;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 }

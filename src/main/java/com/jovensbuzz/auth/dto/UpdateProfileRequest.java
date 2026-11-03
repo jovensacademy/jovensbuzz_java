@@ -15,6 +15,10 @@ public class UpdateProfileRequest {
     @Size(max = 128, message = "Email must not exceed 128 characters")
     private String email;
 
+    // Optional IANA time zone for this user (validated in AuthService); unchanged when absent
+    @Size(max = 64, message = "Time zone must not exceed 64 characters")
+    private String timezone;
+
     public UpdateProfileRequest() {}
 
     public String getDisplayName() {
@@ -31,5 +35,13 @@ public class UpdateProfileRequest {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getTimezone() {
+        return timezone;
+    }
+
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
     }
 }

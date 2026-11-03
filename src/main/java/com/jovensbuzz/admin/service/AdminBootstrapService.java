@@ -1,5 +1,6 @@
 package com.jovensbuzz.admin.service;
 
+import com.jovensbuzz.admin.entity.AdminRole;
 import com.jovensbuzz.admin.entity.AdminUser;
 import com.jovensbuzz.admin.repository.AdminUserRepository;
 import com.jovensbuzz.security.JwtTokenProvider;
@@ -15,7 +16,7 @@ import org.springframework.util.StringUtils;
 /**
  * Creates the first administrator from environment configuration when the admin table is empty.
  * It never overwrites an existing account, so a password changed through the dashboard persists
- * across restarts. The bootstrap account is flagged to change its password on first sign-in.
+ * across restarts. After provisioning, remove the bootstrap variables; sign-in uses only the database.
  */
 @Service
 public class AdminBootstrapService implements CommandLineRunner {
@@ -69,11 +70,10 @@ public class AdminBootstrapService implements CommandLineRunner {
                 passwordEncoder.encode(bootstrapPassword),
                 bootstrapDisplayName,
                 bootstrapEmail.trim().toLowerCase(),
-                "ROLE_ADMIN"
+                AdminRole.OWNER.authority()
         );
-        admin.setMustChangePassword(true);
         adminUserRepository.save(admin);
-        log.info("Bootstrap administrator '{}' created. A password change is required on first sign-in.", admin.getUsername());
+        log.info("Bootstrap owner '{}' created. Remove BOOTSTRAP_ADMIN_USERNAME/PASSWORD from the environment now.", admin.getUsername());
     }
 
     private void verifyProductionSafety() {

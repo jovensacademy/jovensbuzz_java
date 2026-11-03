@@ -10,7 +10,6 @@ public class LoginResponse {
     private String email;
     private String role;
     private Instant expiresAt;
-    private boolean mustChangePassword;
 
     public LoginResponse() {}
 
@@ -79,11 +78,4 @@ public class LoginResponse {
         this.expiresAt = expiresAt;
     }
 
-    public boolean isMustChangePassword() {
-        return mustChangePassword;
-    }
-
-    public void setMustChangePassword(boolean mustChangePassword) {
-        this.mustChangePassword = mustChangePassword;
-    }
 }

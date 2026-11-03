@@ -203,7 +203,7 @@ public class EnquiryService {
         throw new IllegalStateException("Could not allocate a unique enquiry reference");
     }
 
-    static String fingerprint(String email, String service, String message) {
+    public static String fingerprint(String email, String service, String message) {
         String normalised = (email + "|" + service + "|" + message.replaceAll("\\s+", " ").trim())
                 .toLowerCase(Locale.ROOT);
         try {
@@ -466,6 +466,45 @@ public class EnquiryService {
     static String csv(String value) {
         String safe = InputSanitizer.spreadsheetSafe(value == null ? "" : value);
         return "\"" + safe.replace("\"", "\"\"") + "\"";
+    }
+
+    // ---------------------------------------------------------------- soft deletion
+
+    /**
+     * Soft-deletes an enquiry: it disappears from lists, analytics and exports and moves to Deleted enquiries,
+     * where an owner can delete it permanently. Google Sheets rows are never touched.
+     */
+    @Transactional
+    public void deleteEnquiry(Long id, String username) {
+        Enquiry enquiry = findEnquiry(id);
+        enquiry.setDeletedAt(Instant.now());
+        enquiry.setDeletedBy(username);
+        enquiryRepository.save(enquiry);
+        auditLogService.logAction(username, "DELETE_ENQUIRY", "ENQUIRY", String.valueOf(id),
+                "Deleted enquiry " + enquiry.getPublicReference() + " (" + enquiry.getFullName() + "); soft delete");
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeletedEnquiryDto> getDeletedEnquiries() {
+        return enquiryRepository.findDeleted().stream().map(DeletedEnquiryDto::fromEntity).toList();
+    }
+
+    /**
+     * Permanently deletes an enquiry that is already in Deleted enquiries (owner only, enforced in SecurityConfig).
+     * The audit entry is written first, in the same transaction, so a purge is never unrecorded; earlier audit
+     * entries stay. Notes, status history and email/sync job rows are removed with it. Google Sheets rows are
+     * never touched. Active enquiries cannot be purged directly: they must be deleted (soft) first.
+     */
+    @Transactional
+    public void permanentlyDeleteEnquiry(Long id, String username) {
+        Object[] row = enquiryRepository.lockDeletedForPurge(id).stream().findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Deleted enquiry", "id", id));
+        auditLogService.logAction(username, "PERMANENT_DELETE_ENQUIRY", "ENQUIRY", String.valueOf(id),
+                "Permanently deleted enquiry " + row[0] + " (" + row[1] + "); deleted " + row[2] + " by " + row[3]
+                        + "; notes, history and job rows removed; Google Sheets unchanged");
+        if (enquiryRepository.purgeDeleted(id) != 1) {
+            throw new ResourceNotFoundException("Deleted enquiry", "id", id);
+        }
     }
 
     private Enquiry findEnquiry(Long id) {

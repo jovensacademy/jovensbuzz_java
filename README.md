@@ -16,6 +16,7 @@ copy .env.example .env      # then edit .env; it is git-ignored and loaded from 
 - [docs/SMTP_SETUP.md](docs/SMTP_SETUP.md) — Gmail App Password SMTP setup, Microsoft 365
 - [docs/GOOGLE_SHEETS_SETUP.md](docs/GOOGLE_SHEETS_SETUP.md) — Google Sheets sync setup
 - [docs/API_EXAMPLES.md](docs/API_EXAMPLES.md) — curl and PowerShell requests for every endpoint group
+- [docs/ADMIN_ROLES_EXCEL_TIMEZONES.md](docs/ADMIN_ROLES_EXCEL_TIMEZONES.md) — Owner/Manager permissions, user management, Excel import/export, time zones
 - [docs/DOCKER_DEPLOYMENT.md](docs/DOCKER_DEPLOYMENT.md) — Docker / VPS deployment on port 8082 with its own MySQL (`Dockerfile`, `docker-compose.yml`, `.env.docker.example`)
 
 ## Scripts
