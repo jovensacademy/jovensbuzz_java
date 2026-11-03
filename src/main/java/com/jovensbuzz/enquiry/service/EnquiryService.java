@@ -331,7 +331,7 @@ public class EnquiryService {
 
     @Transactional
     public EnquiryDetailResponseDto updateStatus(Long id, EnquiryStatusUpdateRequest request, String username) {
-        Enquiry enquiry = findEnquiry(id);
+        Enquiry enquiry = findEnquiryForUpdate(id);
 
         EnquiryStatus newStatus;
         try {
@@ -368,7 +368,7 @@ public class EnquiryService {
 
     @Transactional
     public EnquiryNoteResponseDto addNote(Long id, EnquiryNoteRequest request, String username) {
-        Enquiry enquiry = findEnquiry(id);
+        Enquiry enquiry = findEnquiryForUpdate(id);
         String text = InputSanitizer.multiLineText(request.getNote());
         if (text == null) {
             throw new BadRequestException("Note content cannot be empty");
@@ -382,7 +382,7 @@ public class EnquiryService {
 
     @Transactional
     public EnquiryDetailResponseDto assign(Long id, EnquiryAssignmentRequest request, String username) {
-        Enquiry enquiry = findEnquiry(id);
+        Enquiry enquiry = findEnquiryForUpdate(id);
         AdminUser assignee = null;
         if (request.getAdminId() != null) {
             assignee = adminUserRepository.findById(request.getAdminId())
@@ -476,7 +476,7 @@ public class EnquiryService {
      */
     @Transactional
     public void deleteEnquiry(Long id, String username) {
-        Enquiry enquiry = findEnquiry(id);
+        Enquiry enquiry = findEnquiryForUpdate(id);
         enquiry.setDeletedAt(Instant.now());
         enquiry.setDeletedBy(username);
         enquiryRepository.save(enquiry);
@@ -509,6 +509,12 @@ public class EnquiryService {
 
     private Enquiry findEnquiry(Long id) {
         return enquiryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Enquiry", "id", id));
+    }
+
+    /** For writes: locks the enquiry row first so concurrent changes to it are serialised (see repository). */
+    private Enquiry findEnquiryForUpdate(Long id) {
+        return enquiryRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Enquiry", "id", id));
     }
 }

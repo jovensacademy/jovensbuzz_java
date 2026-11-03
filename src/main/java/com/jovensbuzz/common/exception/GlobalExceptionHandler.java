@@ -3,7 +3,14 @@ package com.jovensbuzz.common.exception;
 import com.jovensbuzz.common.response.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.dao.QueryTimeoutException;
+import org.springframework.transaction.CannotCreateTransactionException;
+import org.springframework.orm.jpa.JpaSystemException;
+import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.TransactionTimedOutException;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -99,6 +106,37 @@ public class GlobalExceptionHandler {
         log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error("The change conflicts with existing data (for example a duplicate value)"));
+    }
+
+    /** Two requests changed the same record at the same moment (lock conflict / deadlock victim). */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLockConflict(PessimisticLockingFailureException ex) {
+        log.warn("Lock conflict: {}", ex.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error("This record was being changed by another request at the same moment. Please try again."));
+    }
+
+    /** Database slow (query timeout) or unreachable: retryable, no internals in the response. */
+    @ExceptionHandler({QueryTimeoutException.class, TransactionTimedOutException.class, DataAccessResourceFailureException.class,
+            CannotCreateTransactionException.class})
+    public ResponseEntity<ApiResponse<Void>> handleDatabaseUnavailable(Exception ex) {
+        log.error("Database unavailable or timed out: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error("The database is busy or unavailable. Please try again in a moment."));
+    }
+
+    /**
+     * A transaction that failed at the JDBC level, e.g. the rollback after a statement timeout on a connection the
+     * pool has already closed (that error then replaces the original timeout). Retryable: 503. Other failures: 500.
+     */
+    @ExceptionHandler({JpaSystemException.class, TransactionSystemException.class})
+    public ResponseEntity<ApiResponse<Void>> handleTransactionFailure(RuntimeException ex) {
+        for (Throwable cause = ex; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLException) {
+                return handleDatabaseUnavailable(ex);
+            }
+        }
+        return handleGeneralException(ex);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

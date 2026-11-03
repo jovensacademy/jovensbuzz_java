@@ -22,6 +22,12 @@ public enum AdminPermission {
     /** Owner only: never assignable to a manager. */
     USERS_MANAGE("Manage admin users, roles and permissions");
 
+    /** The only permissions a read-only USER can hold: nothing that changes data. */
+    public static final Set<AdminPermission> READ_ONLY = EnumSet.of(ENQUIRIES_VIEW, ENQUIRIES_EXPORT, ANALYTICS_VIEW);
+
+    /** Permissions a new user (read-only role) receives unless the owner chooses otherwise. */
+    public static final Set<AdminPermission> USER_DEFAULTS = EnumSet.of(ENQUIRIES_VIEW, ANALYTICS_VIEW);
+
     /** Permissions a new manager receives unless the owner chooses otherwise. */
     public static final Set<AdminPermission> MANAGER_DEFAULTS = EnumSet.of(
             ENQUIRIES_VIEW, ENQUIRIES_MANAGE, ENQUIRIES_IMPORT, ENQUIRIES_EXPORT, ANALYTICS_VIEW);

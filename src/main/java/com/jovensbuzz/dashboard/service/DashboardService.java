@@ -45,7 +45,21 @@ public class DashboardService {
     }
 
     public static ZoneId parseZone(String tz) {
-        if (tz == null || tz.isBlank()) return ZoneOffset.UTC;
+        return parseZone(tz, null);
+    }
+
+    /** The requested zone, else the account's own display zone (when valid), else UTC. */
+    public static ZoneId parseZone(String tz, String accountZone) {
+        if (tz == null || tz.isBlank()) {
+            if (accountZone != null && !accountZone.isBlank()) {
+                try {
+                    return ZoneId.of(accountZone);
+                } catch (DateTimeException ignored) {
+                    // fall through to UTC
+                }
+            }
+            return ZoneOffset.UTC;
+        }
         try {
             return ZoneId.of(tz);
         } catch (DateTimeException e) {
@@ -78,10 +92,11 @@ public class DashboardService {
         summary.setEnquiriesToday(enquiryRepository.countByCreatedAtAfter(startOfToday));
         summary.setEnquiriesThisMonth(enquiryRepository.countByCreatedAtAfter(startOfMonth));
         summary.setConversionRate(total > 0 ? Math.round(((double) converted / total) * 1000.0) / 10.0 : 0.0);
-        summary.setSyncFailed(syncJobRepository.countByStatus(SyncStatus.FAILED));
-        summary.setSyncPending(syncJobRepository.countByStatus(SyncStatus.PENDING)
-                + syncJobRepository.countByStatus(SyncStatus.RETRYING)
-                + syncJobRepository.countByStatus(SyncStatus.PROCESSING));
+        Map<SyncStatus, Long> sync = syncJobRepository.countsByStatus();
+        summary.setSyncFailed(sync.getOrDefault(SyncStatus.FAILED, 0L));
+        summary.setSyncPending(sync.getOrDefault(SyncStatus.PENDING, 0L)
+                + sync.getOrDefault(SyncStatus.RETRYING, 0L)
+                + sync.getOrDefault(SyncStatus.PROCESSING, 0L));
         summary.setRecentEnquiries(recent.stream()
                 .map(e -> EnquiryResponseDto.fromEntity(e, syncStatuses.getOrDefault(e.getId(), "NOT_QUEUED")))
                 .collect(Collectors.toList()));

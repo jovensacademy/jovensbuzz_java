@@ -345,6 +345,85 @@ class AdminUserManagementIntegrationTest {
         loginExpect(user, INITIAL_PASSWORD, 423); // locked even with the right password
     }
 
+    @Test
+    void userRole_isReadOnly_withViewDefaults_andCannotBeGrantedWritePermissions() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/admin-users/options").header("Authorization", bearer(ownerToken)))
+                .andExpect(jsonPath("$.data.roles", org.hamcrest.Matchers.hasItem("USER")))
+                .andExpect(jsonPath("$.data.userPermissions", org.hamcrest.Matchers.containsInAnyOrder("ANALYTICS_VIEW", "ENQUIRIES_EXPORT", "ENQUIRIES_VIEW")));
+        String user = createUser("USER", null, "Asia/Kolkata");
+        String token = activate(user);
+        mockMvc.perform(get("/api/v1/auth/me").header("Authorization", bearer(token)))
+                .andExpect(jsonPath("$.data.adminRole").value("USER"))
+                .andExpect(jsonPath("$.data.permissions", org.hamcrest.Matchers.containsInAnyOrder("ANALYTICS_VIEW", "ENQUIRIES_VIEW")));
+        expect(token, "GET", "/api/v1/admin/enquiries", 200);
+        expect(token, "GET", "/api/v1/admin/dashboard/summary", 200);
+        mockMvc.perform(patch("/api/v1/admin/enquiries/999999/status").header("Authorization", bearer(token))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"CONTACTED\"}"))
+                .andExpect(status().isForbidden());
+        expect(token, "DELETE", "/api/v1/admin/enquiries/999999", 403);
+        expect(token, "GET", "/api/v1/admin/enquiries/export/excel", 403);
+        expect(token, "GET", "/api/v1/admin/admin-users", 403);
+        expect(token, "GET", "/api/v1/admin/services", 403);
+
+        Long id = idOf(user);
+        update(id, "USER", List.of("ENQUIRIES_VIEW", "ENQUIRIES_MANAGE"), 400);
+        update(id, "USER", List.of("ENQUIRIES_VIEW", "ENQUIRIES_DELETE"), 400);
+        update(id, "USER", List.of("ENQUIRIES_VIEW", "ENQUIRIES_EXPORT"), 200);
+        expect(token, "GET", "/api/v1/admin/enquiries/export/excel", 200);
+        mockMvc.perform(post("/api/v1/admin/admin-users").header("Authorization", bearer(ownerToken))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json(userBody("it_user_" + suffix(), "USER", List.of("CONTENT_MANAGE"), "Asia/Kolkata"))))
+                .andExpect(status().isBadRequest());
+
+        // A stored write permission (e.g. left over from a role change done directly in the DB) never applies
+        AdminUser stored = adminUserRepository.findById(id).orElseThrow();
+        stored.setAssignedPermissions(java.util.EnumSet.of(com.jovensbuzz.admin.entity.AdminPermission.ENQUIRIES_DELETE,
+                com.jovensbuzz.admin.entity.AdminPermission.ENQUIRIES_VIEW));
+        adminUserRepository.save(stored);
+        expect(token, "DELETE", "/api/v1/admin/enquiries/999999", 403);
+
+        // Role changes in both directions work and are audited
+        update(id, "MANAGER", List.of("ENQUIRIES_VIEW", "ENQUIRIES_MANAGE"), 200);
+        update(id, "USER", null, 200);
+        assertTrue(auditLogRepository.findAll().stream().anyMatch(a -> "UPDATE_ADMIN_USER".equals(a.getAction())
+                && String.valueOf(id).equals(a.getEntityId()) && a.getSafeMetadata().contains("role MANAGER -> USER")));
+    }
+
+    @Test
+    void userRole_cannotDeleteAccounts_andOwnerDeletingAUser_endsItsSessions() throws Exception {
+        String user = createUser("USER", null, "Asia/Kolkata");
+        String token = activate(user);
+        String manager = createUser("MANAGER", null, "Asia/Kolkata");
+        Long ownerId = adminUserRepository.findByUsername(OWNER).orElseThrow().getId();
+        expect(token, "DELETE", "/api/v1/admin/admin-users/" + idOf(manager), 403);
+        expect(token, "DELETE", "/api/v1/admin/admin-users/" + ownerId, 403);
+        assertFalse(adminUserRepository.findByUsername(manager).orElseThrow().isDeleted(), "forbidden delete changed nothing");
+
+        Long id = idOf(user);
+        expect(ownerToken, "DELETE", "/api/v1/admin/admin-users/" + id, 200);
+        expect(token, "GET", "/api/v1/admin/dashboard/summary", 401);
+        loginExpect(user, INITIAL_PASSWORD, 401);
+        assertTrue(auditLogRepository.findAll().stream().anyMatch(a -> "DELETE_ADMIN_USER".equals(a.getAction())
+                && String.valueOf(id).equals(a.getEntityId()) && a.getSafeMetadata().contains("USER '" + user + "'")));
+    }
+
+    @Test
+    void dashboard_withoutTz_usesTheCallersOwnTimezone() throws Exception {
+        String kolkata = activate(createUser("MANAGER", null, "Asia/Kolkata"));
+        String a = mockMvc.perform(get("/api/v1/admin/dashboard/enquiry-trends?days=3").header("Authorization", bearer(kolkata)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String b = mockMvc.perform(get("/api/v1/admin/dashboard/enquiry-trends?days=3&tz=Asia/Kolkata").header("Authorization", bearer(kolkata)))
+                .andReturn().getResponse().getContentAsString();
+        assertEquals(objectMapper.readTree(b).path("data"), objectMapper.readTree(a).path("data"), "omitting tz = the account's zone");
+        String summaryA = mockMvc.perform(get("/api/v1/admin/dashboard/summary").header("Authorization", bearer(kolkata)))
+                .andReturn().getResponse().getContentAsString();
+        String summaryB = mockMvc.perform(get("/api/v1/admin/dashboard/summary?tz=Asia/Kolkata").header("Authorization", bearer(kolkata)))
+                .andReturn().getResponse().getContentAsString();
+        assertEquals(objectMapper.readTree(summaryB).path("data").path("enquiriesToday"), objectMapper.readTree(summaryA).path("data").path("enquiriesToday"));
+        mockMvc.perform(get("/api/v1/admin/dashboard/summary?tz=Mars/Olympus").header("Authorization", bearer(kolkata)))
+                .andExpect(status().isBadRequest());
+    }
+
     // ---------------------------------------------------------------- helpers
 
     /** Signs in with the owner-set initial password and returns the session token (no change step). */

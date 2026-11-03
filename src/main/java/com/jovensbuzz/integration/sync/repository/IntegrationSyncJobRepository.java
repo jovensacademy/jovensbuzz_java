@@ -10,7 +10,9 @@ import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Repository
@@ -66,4 +68,14 @@ public interface IntegrationSyncJobRepository extends JpaRepository<IntegrationS
     List<IntegrationSyncJob> findByStatus(SyncStatus status);
 
     long countByStatus(SyncStatus status);
+
+    @Query("SELECT j.status, COUNT(j) FROM IntegrationSyncJob j GROUP BY j.status")
+    List<Object[]> countGroupedByStatus();
+
+    /** Job count per status in one query; statuses without jobs are absent (read with getOrDefault). */
+    default Map<SyncStatus, Long> countsByStatus() {
+        Map<SyncStatus, Long> counts = new EnumMap<>(SyncStatus.class);
+        countGroupedByStatus().forEach(row -> counts.put((SyncStatus) row[0], (Long) row[1]));
+        return counts;
+    }
 }

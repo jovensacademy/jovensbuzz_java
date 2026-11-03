@@ -2,20 +2,23 @@
 
 ## Roles and permissions
 
-| Permission | What it allows | Owner | Manager default |
-|---|---|---|---|
-| `ENQUIRIES_VIEW` | List and open enquiries, assignee picker | ✓ | ✓ |
-| `ENQUIRIES_MANAGE` | Status, notes, assignment, sync/email retry | ✓ | ✓ |
-| `ENQUIRIES_IMPORT` | Excel import (template, preview, validate, commit) | ✓ | ✓ |
-| `ENQUIRIES_EXPORT` | Excel and CSV export | ✓ | ✓ |
-| `ENQUIRIES_DELETE` | Delete (soft) enquiries, view Deleted enquiries (permanent deletion is owner-only) | ✓ | – (grant explicitly) |
-| `ANALYTICS_VIEW` | Overview dashboard and analytics | ✓ | ✓ |
-| `CONTENT_MANAGE` | Website content, services, FAQs | ✓ | – |
-| `SETTINGS_VIEW` | Integration status, retry failed syncs | ✓ | – |
-| `AUDIT_VIEW` | Audit log | ✓ | – |
-| `USERS_MANAGE` | Admin users, roles, permissions (owner only, never assignable) | ✓ | never |
+| Permission | What it allows | Owner | Manager default | User (read-only) |
+|---|---|---|---|---|
+| `ENQUIRIES_VIEW` | List and open enquiries, assignee picker | ✓ | ✓ | ✓ default |
+| `ENQUIRIES_MANAGE` | Status, notes, assignment, sync/email retry | ✓ | ✓ | never |
+| `ENQUIRIES_IMPORT` | Excel import (template, preview, validate, commit) | ✓ | ✓ | never |
+| `ENQUIRIES_EXPORT` | Excel and CSV export | ✓ | ✓ | optional |
+| `ENQUIRIES_DELETE` | Delete (soft) enquiries, view Deleted enquiries (permanent deletion is owner-only) | ✓ | – (grant explicitly) | never |
+| `ANALYTICS_VIEW` | Overview dashboard and analytics | ✓ | ✓ | ✓ default |
+| `CONTENT_MANAGE` | Services and FAQs | ✓ | – | never |
+| `SETTINGS_VIEW` | Integration status, retry failed syncs | ✓ | – | never |
+| `AUDIT_VIEW` | Audit log | ✓ | – | never |
+| `USERS_MANAGE` | Admin users, roles, permissions (owner only, never assignable) | ✓ | never | never |
 
-- **OWNER** holds every permission. **MANAGER** holds only what an owner ticks in **Users**.
+- **OWNER** (Super Admin) holds every permission. **MANAGER** holds only what an owner ticks in **Users**.
+- **USER** is read-only (`ROLE_USER`): at most `ENQUIRIES_VIEW`, `ANALYTICS_VIEW` and `ENQUIRIES_EXPORT`
+  (defaults: view + analytics). Granting anything else to a User is rejected (400), and the cap is applied again when
+  permissions are evaluated, so a stored write permission can never take effect. No migration: `role` is a text column.
 - Enforced on the API in `SecurityConfig` (first match wins; any new `/api/v1/admin/**` path defaults to owner-only).
   Authorities are re-read from the database on every request, so permission changes apply immediately.
 - Migration `V9__admin_roles_permissions_timezone.sql` turns existing `ROLE_ADMIN` accounts into owners
@@ -103,6 +106,10 @@ never in the future. Duplicates: same email + service + message as an existing e
 Imported enquiries use source `ADMIN_IMPORT`, send **no emails**, and go to Google Sheets only when requested.
 
 ## Time zones
+
+- Dashboard endpoints (`/admin/dashboard/*`) take an optional `tz`; when it is omitted they use the signed-in
+  account's own zone (before: UTC). The dashboard pages rely on this so they can load data in parallel with the
+  profile request instead of after it.
 
 - Timestamps are stored in UTC. Each admin has an IANA zone (e.g. `Asia/Kolkata` for India, `America/Chicago` for
   Frisco, TX); fixed offsets (`+05:30`, `GMT-6`) are rejected so daylight saving (CST/CDT) is always correct.

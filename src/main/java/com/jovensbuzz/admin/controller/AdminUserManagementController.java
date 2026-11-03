@@ -49,9 +49,11 @@ public class AdminUserManagementController {
                 .map(p -> Map.of("id", p.name(), "label", p.getDescription()))
                 .toList();
         return ResponseEntity.ok(ApiResponse.success(Map.of(
-                "roles", List.of("OWNER", "MANAGER"),
+                "roles", List.of("OWNER", "MANAGER", "USER"),
                 "permissions", permissions,
                 "managerDefaults", AdminPermission.MANAGER_DEFAULTS.stream().map(Enum::name).sorted().toList(),
+                "userPermissions", AdminPermission.READ_ONLY.stream().map(Enum::name).sorted().toList(),
+                "userDefaults", AdminPermission.USER_DEFAULTS.stream().map(Enum::name).sorted().toList(),
                 "timezones", TimeZones.OPTIONS)));
     }
 

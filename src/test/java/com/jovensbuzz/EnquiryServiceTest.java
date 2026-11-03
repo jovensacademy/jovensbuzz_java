@@ -82,6 +82,7 @@ public class EnquiryServiceTest {
         strategy.setTitle("Social Media Strategy");
         when(serviceItemRepository.findByPublishedTrueOrderByDisplayOrderAsc()).thenReturn(List.of(strategy));
         when(enquiryRepository.findById(1L)).thenReturn(Optional.of(testEnquiry));
+        when(enquiryRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEnquiry)); // writes lock the row
         when(enquiryRepository.existsById(1L)).thenReturn(true);
         when(enquiryRepository.findFirstBySubmissionFingerprintAndCreatedAtAfterOrderByCreatedAtDesc(anyString(), any()))
                 .thenReturn(Optional.empty());

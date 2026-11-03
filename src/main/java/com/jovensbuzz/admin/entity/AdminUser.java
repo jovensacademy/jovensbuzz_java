@@ -282,14 +282,18 @@ public class AdminUser {
                 .collect(Collectors.joining(","));
     }
 
-    /** What this account may actually do: everything for an owner, the assigned subset for a manager. */
+    /**
+     * What this account may actually do: everything for an owner, the assigned subset for a manager, and the
+     * assigned read-only subset for a user (capped here too, so a stored write permission can never apply).
+     */
     public Set<AdminPermission> getEffectivePermissions() {
-        if (isOwner()) {
+        AdminRole adminRole = getAdminRole();
+        if (adminRole == AdminRole.OWNER) {
             return AdminPermission.all();
         }
         EnumSet<AdminPermission> set = EnumSet.noneOf(AdminPermission.class);
         set.addAll(getAssignedPermissions());
-        set.remove(AdminPermission.USERS_MANAGE);
+        set.retainAll(adminRole.grantable());
         return set;
     }
 }

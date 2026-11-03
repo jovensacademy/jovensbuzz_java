@@ -67,7 +67,7 @@ public class AdminUserManagementService {
         AdminUser admin = new AdminUser(username, passwordEncoder.encode(request.initialPassword()),
                 InputSanitizer.plainText(request.displayName()), email, role.authority());
         admin.setTimezone(TimeZones.requireRegion(request.timezone()));
-        admin.setAssignedPermissions(role == AdminRole.MANAGER ? parsePermissions(request.permissions(), true) : null);
+        admin.setAssignedPermissions(role == AdminRole.OWNER ? null : parsePermissions(request.permissions(), role, true));
         admin.setPasswordChangedAt(Instant.now());
         repository.save(admin);
         auditLogService.logAction(actor, "CREATE_ADMIN_USER", "ADMIN_USER", String.valueOf(admin.getId()),
@@ -94,7 +94,7 @@ public class AdminUserManagementService {
         admin.setEmail(email);
         admin.setTimezone(TimeZones.requireRegion(request.timezone()));
         admin.setRole(newRole.authority());
-        admin.setAssignedPermissions(newRole == AdminRole.MANAGER ? parsePermissions(request.permissions(), false) : null);
+        admin.setAssignedPermissions(newRole == AdminRole.OWNER ? null : parsePermissions(request.permissions(), newRole, false));
         repository.save(admin);
 
         String roleNote = newRole != oldRole ? "; role " + oldRole + " -> " + newRole : "";
@@ -194,14 +194,14 @@ public class AdminUserManagementService {
         try {
             return AdminRole.from(role);
         } catch (IllegalArgumentException e) {
-            throw new BadRequestException("Role must be OWNER or MANAGER");
+            throw new BadRequestException("Role must be OWNER, MANAGER or USER");
         }
     }
 
-    /** Validates requested manager permissions; null on create means the manager defaults. */
-    static Set<AdminPermission> parsePermissions(List<String> requested, boolean defaultsWhenNull) {
+    /** Validates requested permissions for a manager or user; null on create means that role's defaults. */
+    static Set<AdminPermission> parsePermissions(List<String> requested, AdminRole role, boolean defaultsWhenNull) {
         if (requested == null) {
-            return defaultsWhenNull ? EnumSet.copyOf(AdminPermission.MANAGER_DEFAULTS) : EnumSet.noneOf(AdminPermission.class);
+            return defaultsWhenNull ? role.defaults() : EnumSet.noneOf(AdminPermission.class);
         }
         EnumSet<AdminPermission> set = EnumSet.noneOf(AdminPermission.class);
         for (String name : requested) {
@@ -213,6 +213,9 @@ public class AdminUserManagementService {
             }
             if (!permission.isAssignableToManager()) {
                 throw new BadRequestException("Managing admin users is reserved for owners");
+            }
+            if (!role.grantable().contains(permission)) {
+                throw new BadRequestException("Users have read-only access; '" + permission.name() + "' needs the Manager role");
             }
             set.add(permission);
         }

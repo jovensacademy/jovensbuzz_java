@@ -7,9 +7,12 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import jakarta.persistence.LockModeType;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +22,15 @@ import java.util.Optional;
 public interface EnquiryRepository extends JpaRepository<Enquiry, Long>, JpaSpecificationExecutor<Enquiry> {
 
     Optional<Enquiry> findByPublicReference(String publicReference);
+
+    /**
+     * Active enquiry, row-locked (SELECT ... FOR UPDATE) for the rest of the transaction. Writers take this lock
+     * first, so concurrent changes to one enquiry queue up instead of deadlocking (history/note inserts take a
+     * shared lock on the enquiry row through their foreign key before the enquiry itself is updated).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM Enquiry e WHERE e.id = :id")
+    Optional<Enquiry> findByIdForUpdate(@Param("id") Long id);
 
     /** Includes soft-deleted rows: references are UNIQUE in the table, so a new one must not reuse a deleted one. */
     @Query(value = "SELECT COUNT(*) FROM enquiries WHERE public_reference = :ref", nativeQuery = true)

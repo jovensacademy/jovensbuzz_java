@@ -55,10 +55,11 @@ public class IntegrationSettingsService {
         status.put("adminNotificationEmail", emailSettings.getAdminNotificationEmail());
         status.put("clientSupportEmail", emailSettings.getClientSupportEmail());
         status.put("responseTime", emailSettings.getResponseTime());
-        status.put("pending", emailJobRepository.countByStatus(EmailNotificationStatus.PENDING)
-                + emailJobRepository.countByStatus(EmailNotificationStatus.PROCESSING));
-        status.put("sent", emailJobRepository.countByStatus(EmailNotificationStatus.SENT));
-        status.put("failed", emailJobRepository.countByStatus(EmailNotificationStatus.FAILED));
+        Map<EmailNotificationStatus, Long> jobs = emailJobRepository.countsByStatus();
+        status.put("pending", jobs.getOrDefault(EmailNotificationStatus.PENDING, 0L)
+                + jobs.getOrDefault(EmailNotificationStatus.PROCESSING, 0L));
+        status.put("sent", jobs.getOrDefault(EmailNotificationStatus.SENT, 0L));
+        status.put("failed", jobs.getOrDefault(EmailNotificationStatus.FAILED, 0L));
         return status;
     }
 
@@ -71,11 +72,12 @@ public class IntegrationSettingsService {
         dto.setWorksheetName(googleSheetsService.getWorksheetName());
         dto.setCredentialsFileReadable(googleSheetsService.isCredentialsFileReadable());
         dto.setServiceAccountEmail(googleSheetsService.getServiceAccountEmail());
-        dto.setPending(syncJobRepository.countByStatus(SyncStatus.PENDING));
-        dto.setProcessing(syncJobRepository.countByStatus(SyncStatus.PROCESSING));
-        dto.setRetrying(syncJobRepository.countByStatus(SyncStatus.RETRYING));
-        dto.setFailed(syncJobRepository.countByStatus(SyncStatus.FAILED));
-        dto.setSucceeded(syncJobRepository.countByStatus(SyncStatus.SUCCESS));
+        Map<SyncStatus, Long> jobs = syncJobRepository.countsByStatus();
+        dto.setPending(jobs.getOrDefault(SyncStatus.PENDING, 0L));
+        dto.setProcessing(jobs.getOrDefault(SyncStatus.PROCESSING, 0L));
+        dto.setRetrying(jobs.getOrDefault(SyncStatus.RETRYING, 0L));
+        dto.setFailed(jobs.getOrDefault(SyncStatus.FAILED, 0L));
+        dto.setSucceeded(jobs.getOrDefault(SyncStatus.SUCCESS, 0L));
         return dto;
     }
 

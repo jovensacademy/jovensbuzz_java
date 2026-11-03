@@ -119,6 +119,11 @@ curl -H "$H" -o enquiries.csv "http://localhost:8081/api/v1/admin/enquiries/expo
 ## Content management
 
 ```bash
+# Dashboard: tz is optional (defaults to the caller's own zone)
+curl -H "$H" "http://localhost:8081/api/v1/admin/dashboard/summary"
+# Errors: 409 when two requests change the same record at the same moment, 503 when the database is busy or down
+# (both safe to retry; no internals in the body)
+
 # Enquiry deletion: soft delete (PERM_ENQUIRIES_DELETE), then permanent delete (owner only, cannot be undone)
 curl -X DELETE -H "$H" http://localhost:8081/api/v1/admin/enquiries/42
 curl -H "$H" http://localhost:8081/api/v1/admin/enquiries/deleted

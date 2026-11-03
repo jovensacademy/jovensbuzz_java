@@ -9,7 +9,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface EmailNotificationJobRepository extends JpaRepository<EmailNotificationJob, Long> {
@@ -44,4 +46,14 @@ public interface EmailNotificationJobRepository extends JpaRepository<EmailNotif
                      @Param("now") Instant now);
 
     long countByStatus(EmailNotificationStatus status);
+
+    @Query("SELECT j.status, COUNT(j) FROM EmailNotificationJob j GROUP BY j.status")
+    List<Object[]> countGroupedByStatus();
+
+    /** Job count per status in one query; statuses without jobs are absent (read with getOrDefault). */
+    default Map<EmailNotificationStatus, Long> countsByStatus() {
+        Map<EmailNotificationStatus, Long> counts = new EnumMap<>(EmailNotificationStatus.class);
+        countGroupedByStatus().forEach(row -> counts.put((EmailNotificationStatus) row[0], (Long) row[1]));
+        return counts;
+    }
 }
